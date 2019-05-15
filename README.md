@@ -1,7 +1,7 @@
 Pixel Plumber
 ============
 
-Pixel Plumber is a game made in Processing for a class at Victoria University of Wellington.
+Pixel Plumber is a game made in [Processing](https://processing.org/) for a class at Victoria University of Wellington.
 
 The idea of the game is that you are a 'plumber' in the future, tasked with unblocking drains of future megacities. You fly through the drains going deeper and deeper and clearing out debris as you go to ensure a constant flow of water. But try and make sure you don't let any of the water interact with the toxic green sludge, it degrades the quality of the water!
 
