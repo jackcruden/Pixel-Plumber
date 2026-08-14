@@ -172,10 +172,15 @@ impl Sim {
         );
         self.player.credits += harvested;
 
-        // Emitters.
+        // Emitters. Back-pressure: stop short of the particle cap so the
+        // supply throttles instead of forcing oldest-particle culls.
+        let headroom = self.fluid.params.particle_cap.saturating_sub(64);
         for e in self.emitters.iter_mut() {
             if e.spec.max > 0 && e.emitted >= e.spec.max {
                 continue;
+            }
+            if self.fluid.len() >= headroom {
+                break;
             }
             e.accum += e.spec.rate * DT;
             while e.accum >= 1.0 {
