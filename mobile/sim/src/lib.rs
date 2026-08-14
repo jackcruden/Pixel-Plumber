@@ -25,9 +25,9 @@ use rng::Rng;
 /// Fixed timestep. Render interpolates; simulation never sees variable dt.
 pub const DT: f32 = 1.0 / 60.0;
 
-pub const DIG_RADIUS: f32 = 4.2;
+pub const DIG_RADIUS: f32 = 3.8;
 pub const DIG_STRENGTH: f32 = 2.4;
-pub const SHOT_SPEED: f32 = 170.0;
+pub const SHOT_SPEED: f32 = 130.0;
 pub const FIRE_INTERVAL: f32 = 0.11;
 /// Water touching the player hurts if hot; molten always does.
 pub const MOLTEN_DAMAGE_RADIUS: f32 = 4.0;
@@ -355,9 +355,11 @@ fn generate_field(level: &Level, materials: &MaterialTable) -> Result<DensityFie
                 2.0,
                 0.5,
             );
-            let mut d = (f - fill.threshold).clamp(-1.0, 1.0);
+            // Steep transition: the field is mostly ±1 with a narrow surface
+            // band, so edges render crisp and chunky rather than mushy.
+            let mut d = ((f - fill.threshold) * 3.0).clamp(-1.0, 1.0);
             if c > caves.threshold {
-                d = -(c - caves.threshold).clamp(0.0, 1.0).max(0.25);
+                d = -((c - caves.threshold) * 3.0).clamp(0.3, 1.0);
             }
             field.density[i] = d;
             field.material[i] = mat;

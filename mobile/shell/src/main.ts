@@ -72,9 +72,10 @@ function main(pp: PP) {
   const cam: Camera = { x: 0, y: 0, scale: 3 };
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  // Camera shows ~120 cells across (zoomed to feel close on a phone) and
-  // never sees past the field edges.
-  const VIEW_W_CELLS = 120;
+  // Camera shows ~72 cells across — tuned for the initial design target of
+  // an iPhone 17 Pro portrait view (402x874 pt) over the 128-cell-wide
+  // level — and never sees past the field edges.
+  const VIEW_W_CELLS = 72;
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     for (const c of [glCanvas, ovCanvas]) {
@@ -229,7 +230,7 @@ function main(pp: PP) {
     const density = new Uint8Array(mem(), pp.pp_density_ptr(), fieldW * fieldH);
     const material = new Uint8Array(mem(), pp.pp_material_ptr(), fieldW * fieldH);
     const pos = new Float32Array(mem(), pp.pp_particle_pos_ptr(), count * 2);
-    const meta = new Uint8Array(mem(), pp.pp_particle_meta_ptr(), count * 2);
+    const meta = new Uint8Array(mem(), pp.pp_particle_meta_ptr(), count * 4);
     renderer.render(glCanvas, cam, density, material, pos, meta, count, now / 1000);
 
     // ---- Overlay ----
@@ -298,7 +299,7 @@ function main(pp: PP) {
       ctx.beginPath();
       if (p.kind === "steam") {
         ctx.arc(sx, sy, (2 + t * 5) * cam.scale * 0.8, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(230, 235, 245, ${0.35 * (1 - t)})`;
+        ctx.fillStyle = `rgba(230, 235, 245, ${0.28 * (1 - t)})`;
       } else {
         ctx.arc(sx, sy, (1 + t * 3.5) * cam.scale * 0.8, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255, 205, 120, ${0.5 * (1 - t)})`;

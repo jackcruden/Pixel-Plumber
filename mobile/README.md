@@ -39,7 +39,7 @@ cd shell && npm install && node build.mjs --single
 - **Keyboard:** A/D move, W/space jump, mouse aim + hold LMB to blast,
   U upgrade tool, R restart.
 
-Goal: route water from the supply pipe to the core intake — 400 units at
+Goal: route water from the supply pipe to the core intake — 250 units at
 ≥ 65% purity. Contaminant (green) ruins purity; molten (orange) kills you but
 solidifies into buildable slag when it meets water. Harvest green mineral
 growths to afford the tool upgrade that cuts vitreous scale (the blue-grey

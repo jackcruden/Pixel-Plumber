@@ -1,11 +1,13 @@
-// Demo level: "Intake Manifold". Portrait, one screen-and-a-bit tall.
+// Demo level: "Intake Manifold". Portrait, tuned for a 402x874pt phone view.
+// Deliberately coarse field (128x224) — features read chunky at the target
+// zoom (~72 cells across), in the spirit of PixelJunk Shooter.
 // Water pours from the supply pipe at the top; the core intake is at the
 // bottom behind a pipework funnel. A molten pocket on the left is the
 // player's slag supply; a contaminant pocket on the right threatens purity.
 Level(
     name: "Intake Manifold",
-    width: 256,
-    height: 384,
+    width: 128,
+    height: 224,
     seed: 7,
     strata: [
         Stratum(material: "sediment", from: 0.0, to: 0.28),
@@ -13,46 +15,46 @@ Level(
         Stratum(material: "vitreous_scale", from: 0.55, to: 0.72),
         Stratum(material: "calcite", from: 0.72, to: 1.01),
     ],
-    fill_noise: NoiseSpec(scale: 0.045, octaves: 4, threshold: -0.28),
-    cave_noise: NoiseSpec(scale: 0.022, octaves: 3, threshold: 0.38),
+    fill_noise: NoiseSpec(scale: 0.07, octaves: 3, threshold: -0.28),
+    cave_noise: NoiseSpec(scale: 0.036, octaves: 3, threshold: 0.38),
     pipes: [
         // Supply pipe stub at the top.
-        Rect(x: 112.0, y: 0.0, w: 6.0, h: 22.0),
-        Rect(x: 138.0, y: 0.0, w: 6.0, h: 22.0),
+        Rect(x: 56.0, y: 0.0, w: 3.0, h: 12.0),
+        Rect(x: 69.0, y: 0.0, w: 3.0, h: 12.0),
         // Intake funnel at the bottom.
-        Rect(x: 92.0, y: 336.0, w: 8.0, h: 48.0),
-        Rect(x: 156.0, y: 336.0, w: 8.0, h: 48.0),
-        Rect(x: 76.0, y: 328.0, w: 24.0, h: 8.0),
-        Rect(x: 156.0, y: 328.0, w: 24.0, h: 8.0),
+        Rect(x: 46.0, y: 196.0, w: 4.0, h: 28.0),
+        Rect(x: 78.0, y: 196.0, w: 4.0, h: 28.0),
+        Rect(x: 38.0, y: 192.0, w: 12.0, h: 4.0),
+        Rect(x: 78.0, y: 192.0, w: 12.0, h: 4.0),
         // A mid-level deck the water must be routed around.
-        Rect(x: 40.0, y: 236.0, w: 90.0, h: 6.0),
-        Rect(x: 160.0, y: 236.0, w: 60.0, h: 6.0),
+        Rect(x: 20.0, y: 138.0, w: 45.0, h: 4.0),
+        Rect(x: 80.0, y: 138.0, w: 30.0, h: 4.0),
     ],
     clears: [
         // Spawn chamber under the supply pipe.
-        Rect(x: 88.0, y: 20.0, w: 80.0, h: 42.0),
+        Rect(x: 44.0, y: 10.0, w: 40.0, h: 24.0),
         // Breathing room above the intake funnel.
-        Rect(x: 104.0, y: 340.0, w: 48.0, h: 30.0),
+        Rect(x: 52.0, y: 198.0, w: 24.0, h: 18.0),
     ],
     mineral_veins: [
-        MineralVein(x: 58.0, y: 118.0, r: 6.0),
-        MineralVein(x: 204.0, y: 96.0, r: 5.0),
-        MineralVein(x: 198.0, y: 258.0, r: 7.0),
-        MineralVein(x: 84.0, y: 300.0, r: 6.0),
+        MineralVein(x: 29.0, y: 69.0, r: 4.0),
+        MineralVein(x: 102.0, y: 56.0, r: 4.0),
+        MineralVein(x: 99.0, y: 151.0, r: 4.5),
+        MineralVein(x: 42.0, y: 175.0, r: 4.0),
     ],
     emitters: [
-        Emitter(x: 128.0, y: 12.0, vx: 0.0, vy: 25.0, rate: 32.0, kind: "water", max: 0),
+        Emitter(x: 64.0, y: 6.0, vx: 0.0, vy: 25.0, rate: 30.0, kind: "water", max: 0),
     ],
     molten_pools: [
-        Rect(x: 26.0, y: 176.0, w: 48.0, h: 22.0),
+        Rect(x: 13.0, y: 103.0, w: 24.0, h: 13.0),
     ],
     contaminant_pools: [
-        Rect(x: 182.0, y: 148.0, w: 44.0, h: 18.0),
+        Rect(x: 91.0, y: 86.0, w: 22.0, h: 11.0),
     ],
-    intake: Rect(x: 104.0, y: 368.0, w: 48.0, h: 14.0),
-    goal_volume: 400,
+    intake: Rect(x: 52.0, y: 214.0, w: 24.0, h: 9.0),
+    goal_volume: 250,
     goal_purity: 0.65,
-    player_spawn: (128.0, 48.0),
+    player_spawn: (64.0, 28.0),
     ambient_heat_base: 0.0,
-    ambient_heat_per_depth: 0.0012,
+    ambient_heat_per_depth: 0.002,
 )

@@ -56,8 +56,8 @@ fn sim_replay_matches() {
         let input = InputFrame {
             move_x: 0.6,
             firing: true,
-            aim_x: 128.0,
-            aim_y: 300.0,
+            aim_x: 64.0,
+            aim_y: 150.0,
             ..Default::default()
         };
         for _ in 0..240 {
@@ -135,8 +135,8 @@ fn mass_conservation() {
     // Stir things up: dig a shaft so water reaches molten/contaminant/intake.
     for step in 0..1200u64 {
         if step % 30 == 0 && step < 660 {
-            let y = 70.0 + (step as f32 / 30.0) * 14.0;
-            s.dig_at(128.0, y, 6.0, 2.5);
+            let y = 36.0 + (step as f32 / 30.0) * 8.0;
+            s.dig_at(64.0, y, 4.5, 2.5);
         }
         s.step(&InputFrame::default());
     }
@@ -160,7 +160,7 @@ fn purity_bounded_and_monotone() {
     let mut s = make_sim();
     // Track a window of purity values across a run that mixes water into
     // the contaminant pool.
-    s.spawn_blob(204.0, 140.0, 8.0, s.ids.water, 150);
+    s.spawn_blob(102.0, 80.0, 5.0, s.ids.water, 100);
     let mut last_mean = 1.0f64;
     for _ in 0..600 {
         s.step(&InputFrame::default());
@@ -217,11 +217,11 @@ fn no_teleportation() {
 #[test]
 fn slag_accretion_accounting() {
     let mut s = make_sim();
-    s.dig_at(128.0, 260.0, 12.0, 3.0);
-    s.dig_at(128.0, 272.0, 10.0, 3.0);
+    s.dig_at(64.0, 130.0, 8.0, 3.0);
+    s.dig_at(64.0, 138.0, 7.0, 3.0);
     let base_solid = s.field.total_solid();
-    s.spawn_blob(128.0, 268.0, 6.0, s.ids.molten, 60);
-    s.spawn_blob(128.0, 248.0, 6.0, s.ids.water, 100);
+    s.spawn_blob(64.0, 134.0, 5.0, s.ids.molten, 50);
+    s.spawn_blob(64.0, 118.0, 5.0, s.ids.water, 80);
     for _ in 0..400 {
         s.step(&InputFrame::default());
     }

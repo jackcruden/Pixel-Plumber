@@ -21,7 +21,8 @@ pub struct State {
     /// filtering; the material grid is read straight from the field with
     /// NEAREST filtering.
     density_u8: Vec<u8>,
-    /// Per-particle metadata: [kind, purity*255] pairs.
+    /// Per-particle metadata: [kind, purity*255, speed_norm*255, 0] quads.
+    /// Speed drives foam/turbulence rendering in the shell.
     meta: Vec<u8>,
     /// Cosmetic events: steam positions then impact positions, xy pairs.
     events: Vec<f32>,
@@ -97,10 +98,14 @@ pub extern "C" fn pp_step(move_x: f32, aim_x: f32, aim_y: f32, buttons: u32) {
 
     // Particle metadata.
     let fl = &st.sim.fluid;
+    let inv_max_v = 1.0 / fl.params.max_velocity;
     st.meta.clear();
     for i in 0..fl.len() {
         st.meta.push(fl.kind[i]);
         st.meta.push((fl.purity[i] * 255.0) as u8);
+        let speed = (fl.vel[i].length() * inv_max_v * 3.0).min(1.0);
+        st.meta.push((speed * 255.0) as u8);
+        st.meta.push(0);
     }
 
     // Cosmetic events: steam then shot impacts.

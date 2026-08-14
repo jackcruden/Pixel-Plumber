@@ -16,8 +16,8 @@ const LEVEL: &str = include_str!("../../levels/demo.ron");
 fn loaded_sim() -> Sim {
     let mut s = Sim::new(LEVEL, MATERIALS).expect("sim");
     // Fill toward the particle cap for a worst-case-ish frame.
-    s.spawn_blob(128.0, 100.0, 20.0, s.ids.water, 1500);
-    s.spawn_blob(80.0, 250.0, 15.0, s.ids.water, 800);
+    s.spawn_blob(64.0, 60.0, 16.0, s.ids.water, 1500);
+    s.spawn_blob(40.0, 150.0, 12.0, s.ids.water, 800);
     for _ in 0..120 {
         s.step(&InputFrame::default());
     }
@@ -37,9 +37,9 @@ fn bench_brush(c: &mut Criterion) {
         b.iter(|| {
             s.field.apply_brush(
                 Brush {
-                    x: 128.0,
-                    y: 200.0,
-                    radius: 6.0,
+                    x: 64.0,
+                    y: 100.0,
+                    radius: 5.0,
                     strength: -0.01,
                     material: 0,
                 },

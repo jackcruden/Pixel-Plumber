@@ -1,6 +1,10 @@
 // WebGL2 renderer: terrain from the density/material textures, fluid as
 // metaballs (splat -> threshold), all reading zero-copy views into WASM
 // linear memory.
+//
+// Look: chunky PixelJunk-Shooter-style rendering — posterised material
+// shading in big blocks, dark surface outlines with a lit top crust,
+// ambient-occluded caves, and water with speed-driven foam.
 
 export interface Camera {
   // World-cell offset of the top-left of the view and cells-per-pixel scale.
@@ -38,7 +42,7 @@ const TERRAIN_FS = `#version 300 es
 precision highp float;
 in vec2 vUv;
 out vec4 frag;
-uniform sampler2D uDensity;   // R8 LINEAR, 128 = surface
+uniform sampler2D uDensity;   // R8 LINEAR, 0.5 = surface
 uniform sampler2D uMaterial;  // R8 NEAREST, material index
 uniform vec3 uPalette[16];
 uniform vec2 uView;           // view size in cells
@@ -54,37 +58,66 @@ void main() {
   vec2 world = vec2(uCam.x + vUv.x * uView.x, uCam.y + (1.0 - vUv.y) * uView.y);
   vec2 uv = world / uField;
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) {
-    // Outside the level: solid machine casing.
-    frag = vec4(0.10, 0.10, 0.13, 1.0);
+    frag = vec4(0.075, 0.075, 0.10, 1.0);
     return;
   }
-  float d = texture(uDensity, uv).r;           // 0.5 = surface
+  float d = texture(uDensity, uv).r;
   float mat = texture(uMaterial, uv).r * 255.0;
   int mi = int(mat + 0.5);
   vec3 base = uPalette[mi > 15 ? 0 : mi];
+  float depthFrac = world.y / uField.y;
 
   // Antialiased solid mask around the iso-surface.
-  float w = fwidth(d) * 1.2 + 0.004;
-  float solid = smoothstep(0.5 - w, 0.5 + w, d);
+  float aa = fwidth(d) * 1.2 + 0.004;
+  float solid = smoothstep(0.5 - aa, 0.5 + aa, d);
 
-  // Grain: cell-scale speckle so deposits read as mineral, not flat fill.
-  float g = hash(floor(world * 2.0)) * 0.16 + hash(floor(world * 0.5)) * 0.10;
-  float depthShade = 1.0 - 0.30 * (world.y / uField.y);
-  vec3 rock = base * (0.82 + g) * depthShade;
-  // Edge highlight just inside the surface.
-  float edge = smoothstep(0.5, 0.56, d) * (1.0 - smoothstep(0.56, 0.70, d));
-  rock += base * edge * 0.35;
+  // ---- Rock interior: posterised chunky shading ----
+  // Big 2-cell blocks quantised into three value bands, plus sparse larger
+  // blotches — features read at phone size instead of fine speckle.
+  float blocks = hash(floor(world / 2.0));
+  float band = floor(blocks * 3.0) / 3.0;
+  float shade = 0.80 + band * 0.30;
+  float blotch = hash(floor(world / 6.0) + 13.0);
+  if (blotch < 0.28) shade *= 0.82;
+  shade *= 1.0 - 0.22 * depthFrac;
+  vec3 rock = base * shade;
 
-  // Empty space: dark cavern with faint depth gradient and dust.
-  vec3 cave = mix(vec3(0.055, 0.05, 0.075), vec3(0.02, 0.02, 0.03), world.y / uField.y);
-  cave += hash(floor(world * 1.3)) * 0.012;
+  // Pipework (index 4): machined horizontal banding, no mineral grain.
+  if (mi == 4) {
+    float stripe = step(0.55, fract(world.y / 3.0));
+    rock = base * (0.85 + 0.18 * stripe) * (1.0 - 0.15 * depthFrac);
+  }
+  // Slag (index 5): cooled-magma flecks of ember.
+  if (mi == 5) {
+    float fleck = step(0.90, hash(floor(world * 1.2) + 3.0));
+    rock += vec3(0.55, 0.22, 0.05) * fleck;
+  }
+
+  // Dark outline hugging the surface (the PixelJunk silhouette).
+  float outline = smoothstep(0.50, 0.535, d) * (1.0 - smoothstep(0.56, 0.63, d));
+  rock *= 1.0 - 0.62 * outline;
+
+  // Lit crust on up-facing surfaces: compare against the density one cell up.
+  float dUp = texture(uDensity, (world - vec2(0.0, 1.3)) / uField).r;
+  float crust = smoothstep(0.05, 0.22, d - dUp)
+              * smoothstep(0.50, 0.56, d) * (1.0 - smoothstep(0.60, 0.72, d));
+  rock += base * crust * 0.85 + vec3(0.10) * crust;
+
+  // ---- Cave: dark ground, wall occlusion, faint large-scale variation ----
+  vec3 cave = mix(vec3(0.10, 0.09, 0.13), vec3(0.035, 0.035, 0.055), depthFrac);
+  cave *= 0.85 + 0.15 * hash(floor(world / 5.0) + 31.0);
+  // Ambient occlusion: empty space near a wall darkens — quantised into
+  // bands so it reads as chunky shadow, not blur.
+  float ao = smoothstep(0.34, 0.50, d);
+  ao = floor(ao * 3.0 + 0.5) / 3.0;
+  cave *= 1.0 - 0.42 * ao;
 
   frag = vec4(mix(cave, rock, solid), 1.0);
 }`;
 
 const SPLAT_VS = `#version 300 es
 layout(location=0) in vec2 aPos;   // world cells
-layout(location=1) in vec2 aMeta;  // kind, purity (0..255)
+layout(location=1) in vec4 aMeta;  // kind, purity, speed, _ (0..255)
 uniform vec2 uCam;
 uniform vec2 uView;
 uniform float uPointPx;
@@ -98,12 +131,21 @@ void main() {
   gl_PointSize = uPointPx;
   int k = int(aMeta.x + 0.5);
   float purity = aMeta.y / 255.0;
+  float speed = aMeta.z / 255.0;
   vec3 c = uPalette[k > 15 ? 0 : k];
+  vGlow = 0.0;
   if (k == int(uKinds.x + 0.5)) {
-    // Water shifts toward murk as purity drops.
-    c = mix(vec3(0.45, 0.50, 0.18), c, purity);
+    // Water: murkier as purity drops, whitened by speed (turbulence foam).
+    c = mix(vec3(0.42, 0.47, 0.16), c, purity);
+    c = mix(c, vec3(0.93, 0.97, 1.0), speed * speed * 0.85);
+  } else if (k == int(uKinds.z + 0.5)) {
+    // Molten: fast flow is bright liquid fire, slow flow crusts dark.
+    c = mix(c * 0.55, vec3(1.0, 0.78, 0.25), speed * 0.9 + 0.15);
+    vGlow = 1.0;
+  } else if (k == int(uKinds.y + 0.5)) {
+    // Contaminant: dull sludge, slightly lighter when agitated.
+    c = mix(c * 0.8, c * 1.15, speed);
   }
-  vGlow = (k == int(uKinds.z + 0.5)) ? 1.0 : 0.0;
   vColor = c;
 }`;
 
@@ -125,19 +167,40 @@ precision highp float;
 in vec2 vUv;
 out vec4 frag;
 uniform sampler2D uSplat;
+uniform vec2 uCam;
+uniform vec2 uView;
+uniform float uTime;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
 void main() {
   vec4 s = texture(uSplat, vUv);
   float t = s.a;
-  // Metaball threshold with a soft shoulder.
-  float body = smoothstep(0.22, 0.38, t);
-  if (body <= 0.0) discard;
+  float body = smoothstep(0.20, 0.34, t);
+  if (body <= 0.003) discard;
   vec3 c = s.rgb / max(t, 1e-4);
-  // Surface sheen where the field just crosses the threshold.
-  float rim = smoothstep(0.22, 0.30, t) * (1.0 - smoothstep(0.30, 0.55, t));
-  c += rim * 0.25;
-  // Deep-body darkening gives volume.
-  c *= 1.0 - smoothstep(0.6, 1.6, t) * 0.25;
-  frag = vec4(c, body * 0.92);
+
+  // Depth: thick fluid darkens and saturates.
+  c *= 1.0 - smoothstep(0.55, 1.5, t) * 0.30;
+
+  // Surface band near the threshold.
+  float rim = smoothstep(0.20, 0.29, t) * (1.0 - smoothstep(0.29, 0.52, t));
+
+  // Foam: animated chunky dither on the surface band. Fast (already
+  // whitened) fluid foams hard; calm surfaces get only a thin bright line.
+  vec2 world = vec2(uCam.x + vUv.x * uView.x, uCam.y + (1.0 - vUv.y) * uView.y);
+  float sparkle = step(0.42, hash(floor(world * 1.6) + floor(uTime * 7.0) * 17.0));
+  float whiteness = smoothstep(0.55, 0.9, max(c.r, max(c.g, c.b)));
+  float foam = rim * (0.30 + 0.70 * max(sparkle * 0.8, whiteness));
+  c = mix(c, vec3(0.94, 0.97, 1.0), clamp(foam, 0.0, 0.85));
+
+  // Top-surface sheen: t falls off upward at an up-facing surface.
+  float sheen = clamp(-dFdy(t) * 6.0, 0.0, 1.0) * rim;
+  c += sheen * 0.20;
+
+  frag = vec4(c, body * 0.95);
 }`;
 
 export class Renderer {
@@ -216,7 +279,7 @@ export class Renderer {
     this.metaBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.metaBuf);
     gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 2, gl.UNSIGNED_BYTE, false, 0, 0);
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, false, 0, 0);
 
     // Splat FBO (created on first resize).
     this.splatFbo = gl.createFramebuffer()!;
@@ -270,12 +333,13 @@ export class Renderer {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.posBuf);
       gl.bufferData(gl.ARRAY_BUFFER, particlePos.subarray(0, particleCount * 2), gl.DYNAMIC_DRAW);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.metaBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, particleMeta.subarray(0, particleCount * 2), gl.DYNAMIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, particleMeta.subarray(0, particleCount * 4), gl.DYNAMIC_DRAW);
       const u = (n: string) => gl.getUniformLocation(this.splatProg, n);
       gl.uniform2f(u("uCam"), cam.x, cam.y);
       gl.uniform2f(u("uView"), viewW, viewH);
-      // Metaball support radius ~2.2 cells at half-res.
-      gl.uniform1f(u("uPointPx"), 2.2 * cam.scale);
+      // Splat support radius ~2.6 cells; the FBO is half-res, so a point's
+      // pixel size there is cells * (scale/2) * 2 = cells * scale.
+      gl.uniform1f(u("uPointPx"), 2.6 * cam.scale);
       gl.uniform3fv(u("uPalette"), this.palette);
       gl.uniform3f(u("uKinds"), this.kinds[0], this.kinds[1], this.kinds[2]);
       gl.enable(gl.BLEND);
@@ -297,7 +361,6 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.materialTex);
     gl.uniform1i(t("uMaterial"), 1);
     gl.uniform3fv(t("uPalette"), this.palette);
-    // Flip Y: world y grows down, clip y grows up — handled by uv math.
     gl.uniform2f(t("uView"), viewW, viewH);
     gl.uniform2f(t("uCam"), cam.x, cam.y);
     gl.uniform2f(t("uField"), this.fieldW, this.fieldH);
@@ -310,6 +373,9 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.splatTex);
     gl.uniform1i(c("uSplat"), 0);
+    gl.uniform2f(c("uCam"), cam.x, cam.y);
+    gl.uniform2f(c("uView"), viewW, viewH);
+    gl.uniform1f(c("uTime"), time);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
