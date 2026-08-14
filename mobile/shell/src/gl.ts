@@ -87,10 +87,21 @@ void main() {
     float stripe = step(0.55, fract(world.y / 3.0));
     rock = base * (0.85 + 0.18 * stripe) * (1.0 - 0.15 * depthFrac);
   }
-  // Slag (index 5): cooled-magma flecks of ember.
+  // Slag (index 5): cooled-magma flecks of ember, faintly breathing.
   if (mi == 5) {
     float fleck = step(0.90, hash(floor(world * 1.2) + 3.0));
-    rock += vec3(0.55, 0.22, 0.05) * fleck;
+    rock += vec3(0.55, 0.22, 0.05) * fleck * (0.75 + 0.25 * sin(uTime * 2.0 + world.x));
+  }
+  // Vitreous scale (index 3): rare twinkling glints, not static.
+  if (mi == 3) {
+    vec2 cell = floor(world / 2.0);
+    float spark = step(0.985, hash(cell + 9.0));
+    float tw = 0.5 + 0.5 * sin(uTime * 2.5 + hash(cell + 2.0) * 40.0);
+    rock += vec3(0.40, 0.55, 0.58) * spark * tw * 0.7;
+  }
+  // Mineral growth (index 6): pulse so harvestables catch the eye.
+  if (mi == 6) {
+    rock *= 1.0 + 0.28 * (0.5 + 0.5 * sin(uTime * 3.0));
   }
 
   // Dark outline hugging the surface (the PixelJunk silhouette).
@@ -101,18 +112,35 @@ void main() {
   float dUp = texture(uDensity, (world - vec2(0.0, 1.3)) / uField).r;
   float crust = smoothstep(0.05, 0.22, d - dUp)
               * smoothstep(0.50, 0.56, d) * (1.0 - smoothstep(0.60, 0.72, d));
-  rock += base * crust * 0.85 + vec3(0.10) * crust;
+  rock += base * crust * 0.60 + vec3(0.05) * crust;
 
-  // ---- Cave: dark ground, wall occlusion, faint large-scale variation ----
-  vec3 cave = mix(vec3(0.10, 0.09, 0.13), vec3(0.035, 0.035, 0.055), depthFrac);
-  cave *= 0.85 + 0.15 * hash(floor(world / 5.0) + 31.0);
+  // ---- Cave: layered machine backdrop with parallax ----
+  // The backdrop pattern scrolls slower than the terrain, so open space
+  // reads as depth into the machine rather than flat black.
+  vec2 bg = vec2(uCam.x, uCam.y) * 0.55 + (world - vec2(uCam.x, uCam.y));
+  vec3 cave = mix(vec3(0.085, 0.082, 0.115), vec3(0.028, 0.028, 0.048), depthFrac);
+  // Distant machine plates: big panels with darker seams and rivets.
+  vec2 pl = fract(bg / 11.0) * 11.0;
+  float plate = hash(floor(bg / 11.0) + 40.0);
+  cave *= 0.88 + 0.24 * plate;
+  float seam = step(pl.x, 0.55) + step(pl.y, 0.55);
+  cave *= 1.0 - 0.28 * clamp(seam, 0.0, 1.0);
+  float rivet = step(distance(pl, vec2(1.6, 1.6)), 0.5);
+  cave += vec3(0.030, 0.030, 0.040) * rivet;
+  // Distant rock silhouettes drifting behind the plates.
+  float sil = hash(floor(bg / 7.0) + 5.0);
+  cave *= 0.84 + 0.26 * step(0.45, sil);
   // Ambient occlusion: empty space near a wall darkens — quantised into
   // bands so it reads as chunky shadow, not blur.
   float ao = smoothstep(0.34, 0.50, d);
   ao = floor(ao * 3.0 + 0.5) / 3.0;
-  cave *= 1.0 - 0.42 * ao;
+  cave *= 1.0 - 0.45 * ao;
 
-  frag = vec4(mix(cave, rock, solid), 1.0);
+  vec3 col = mix(cave, rock, solid);
+  // Vignette pulls focus to the centre of the view.
+  float vig = smoothstep(1.25, 0.55, length(vUv - 0.5) * 1.65);
+  col *= 0.80 + 0.20 * vig;
+  frag = vec4(col, 1.0);
 }`;
 
 const SPLAT_VS = `#version 300 es
@@ -121,6 +149,7 @@ layout(location=1) in vec4 aMeta;  // kind, purity, speed, _ (0..255)
 uniform vec2 uCam;
 uniform vec2 uView;
 uniform float uPointPx;
+uniform float uGlowPass; // 1.0: draw only molten, as a large soft light
 out vec3 vColor;
 out float vGlow;
 uniform vec3 uPalette[16];
@@ -129,6 +158,10 @@ void main() {
   vec2 clip = ((aPos - uCam) / uView) * 2.0 - 1.0;
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   gl_PointSize = uPointPx;
+  if (uGlowPass > 0.5 && abs(aMeta.x - uKinds.z) > 0.5) {
+    gl_Position = vec4(-3.0, -3.0, 0.0, 1.0);
+    gl_PointSize = 0.0;
+  }
   int k = int(aMeta.x + 0.5);
   float purity = aMeta.y / 255.0;
   float speed = aMeta.z / 255.0;
@@ -153,13 +186,14 @@ const SPLAT_FS = `#version 300 es
 precision mediump float;
 in vec3 vColor;
 in float vGlow;
+uniform float uGain;
 out vec4 frag;
 void main() {
   vec2 d = gl_PointCoord * 2.0 - 1.0;
   float r2 = dot(d, d);
   if (r2 > 1.0) discard;
   float w = exp(-r2 * 3.0) * 0.30;
-  frag = vec4(vColor * w, w) * (1.0 + vGlow * 0.6);
+  frag = vec4(vColor * w, w) * (1.0 + vGlow * 0.6) * uGain;
 }`;
 
 const COMPOSITE_FS = `#version 300 es
@@ -176,11 +210,19 @@ float hash(vec2 p) {
 }
 
 void main() {
-  vec4 s = texture(uSplat, vUv);
+  vec2 world = vec2(uCam.x + vUv.x * uView.x, uCam.y + (1.0 - vUv.y) * uView.y);
+  // Jelly wobble: perturb the lookup per 2-cell block, twice a second.
+  vec2 wob = vec2(hash(floor(world / 2.0) + floor(uTime * 2.0) * 3.0),
+                  hash(floor(world / 2.0) + floor(uTime * 2.0) * 3.0 + 7.0)) - 0.5;
+  vec4 s = texture(uSplat, vUv + wob * 0.0022);
   float t = s.a;
   float body = smoothstep(0.20, 0.34, t);
   if (body <= 0.003) discard;
   vec3 c = s.rgb / max(t, 1e-4);
+
+  // Caustic shimmer: large soft patches drifting through the body.
+  float caustic = step(0.72, hash(floor(world / 3.5) + floor(uTime * 2.0) * 11.0));
+  c += caustic * 0.035 * smoothstep(0.40, 0.90, t);
 
   // Depth: thick fluid darkens and saturates.
   c *= 1.0 - smoothstep(0.55, 1.5, t) * 0.30;
@@ -190,7 +232,6 @@ void main() {
 
   // Foam: animated chunky dither on the surface band. Fast (already
   // whitened) fluid foams hard; calm surfaces get only a thin bright line.
-  vec2 world = vec2(uCam.x + vUv.x * uView.x, uCam.y + (1.0 - vUv.y) * uView.y);
   float sparkle = step(0.42, hash(floor(world * 1.6) + floor(uTime * 7.0) * 17.0));
   float whiteness = smoothstep(0.55, 0.9, max(c.r, max(c.g, c.b)));
   float foam = rim * (0.30 + 0.70 * max(sparkle * 0.8, whiteness));
@@ -340,6 +381,8 @@ export class Renderer {
       // Splat support radius ~2.6 cells; the FBO is half-res, so a point's
       // pixel size there is cells * (scale/2) * 2 = cells * scale.
       gl.uniform1f(u("uPointPx"), 2.6 * cam.scale);
+      gl.uniform1f(u("uGlowPass"), 0);
+      gl.uniform1f(u("uGain"), 1);
       gl.uniform3fv(u("uPalette"), this.palette);
       gl.uniform3f(u("uKinds"), this.kinds[0], this.kinds[1], this.kinds[2]);
       gl.enable(gl.BLEND);
@@ -380,5 +423,23 @@ export class Renderer {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.disable(gl.BLEND);
+
+    // --- Pass 4: molten glow — large soft additive lights over the scene ---
+    if (particleCount > 0) {
+      gl.useProgram(this.splatProg);
+      gl.bindVertexArray(this.particleVao);
+      const g = (n: string) => gl.getUniformLocation(this.splatProg, n);
+      gl.uniform2f(g("uCam"), cam.x, cam.y);
+      gl.uniform2f(g("uView"), viewW, viewH);
+      gl.uniform1f(g("uPointPx"), Math.min(9.0 * cam.scale, 220));
+      gl.uniform1f(g("uGlowPass"), 1);
+      gl.uniform1f(g("uGain"), 0.10);
+      gl.uniform3fv(g("uPalette"), this.palette);
+      gl.uniform3f(g("uKinds"), this.kinds[0], this.kinds[1], this.kinds[2]);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.drawArrays(gl.POINTS, 0, particleCount);
+      gl.disable(gl.BLEND);
+    }
   }
 }
