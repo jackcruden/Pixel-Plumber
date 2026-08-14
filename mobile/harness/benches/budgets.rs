@@ -16,11 +16,11 @@ const LEVEL: &str = include_str!("../../levels/demo.ron");
 fn loaded_sim() -> Sim {
     // Push the win condition out of reach: a bench frame must be a real
     // frame, not the Won-state early return.
-    let level = LEVEL.replace("goal_volume: 250", "goal_volume: 100000000");
+    let level = LEVEL.replace("goal_volume: 200", "goal_volume: 100000000");
     let mut s = Sim::new(&level, MATERIALS).expect("sim");
     // Fill toward the particle cap for a worst-case-ish frame.
-    s.spawn_blob(64.0, 60.0, 16.0, s.ids.water, 1500);
-    s.spawn_blob(40.0, 150.0, 12.0, s.ids.water, 800);
+    s.spawn_blob(48.0, 45.0, 13.0, s.ids.water, 1500);
+    s.spawn_blob(30.0, 112.0, 10.0, s.ids.water, 800);
     for _ in 0..120 {
         s.step(&InputFrame::default());
     }
@@ -40,9 +40,9 @@ fn bench_brush(c: &mut Criterion) {
         b.iter(|| {
             s.field.apply_brush(
                 Brush {
-                    x: 64.0,
-                    y: 100.0,
-                    radius: 5.0,
+                    x: 48.0,
+                    y: 75.0,
+                    radius: 4.5,
                     strength: -0.01,
                     material: 0,
                 },

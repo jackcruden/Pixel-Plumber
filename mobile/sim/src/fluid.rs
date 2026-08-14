@@ -62,7 +62,7 @@ impl Default for FluidParams {
             spacing: 1.3,
             gravity: 240.0,
             iterations: 3,
-            max_velocity: 130.0,
+            max_velocity: 100.0,
             s_corr_k: 0.0006,
             interact_radius: 2.0,
             purity_mix_rate: 3.0,
@@ -424,6 +424,58 @@ impl Fluid {
             if len > max_move {
                 self.predicted[i] = self.pos[i] + d * (max_move / len);
             }
+        }
+
+        // Continuous collision: sweep each particle's path so a pressure
+        // spike can never carry it through a thin wall in a single step
+        // (endpoint-only tests miss walls thinner than the step). Particles
+        // already embedded in solid (e.g. by slag accretion around them) are
+        // skipped — the iterative push-out above works them free instead.
+        for i in 0..n {
+            let from = self.pos[i];
+            let to = self.predicted[i];
+            let d = to - from;
+            let len = d.length();
+            if len < 0.5 || field.sample(from.x, from.y) > 0.0 {
+                continue;
+            }
+            let steps = (len / 0.5).ceil() as i32;
+            let inc = d / steps as f32;
+            let mut p = from;
+            let mut hit_at = None;
+            for k in 0..steps {
+                let next = p + inc;
+                if field.sample(next.x, next.y) > 0.0 {
+                    hit_at = Some(k);
+                    break;
+                }
+                p = next;
+            }
+            let Some(k) = hit_at else { continue };
+            // Slide: drop the into-wall component of the remaining motion and
+            // march the tangential remainder, so fluid flows along surfaces
+            // instead of sticking to them.
+            let remaining = d * ((steps - k) as f32 / steps as f32);
+            let (gx, gy) = field.gradient(p.x + inc.x, p.y + inc.y);
+            let g = Vec2::new(gx, gy);
+            let glen = g.length();
+            if glen > 1e-5 {
+                let nrm = g / glen;
+                let tang = remaining - nrm * remaining.dot(nrm);
+                let tlen = tang.length();
+                if tlen > 0.05 {
+                    let tsteps = (tlen / 0.5).ceil() as i32;
+                    let tinc = tang / tsteps as f32;
+                    for _ in 0..tsteps {
+                        let next = p + tinc;
+                        if field.sample(next.x, next.y) > 0.0 {
+                            break;
+                        }
+                        p = next;
+                    }
+                }
+            }
+            self.predicted[i] = p;
         }
 
         // 4. Velocities from positions, then XSPH viscosity per material.

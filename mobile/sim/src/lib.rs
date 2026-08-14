@@ -25,9 +25,9 @@ use rng::Rng;
 /// Fixed timestep. Render interpolates; simulation never sees variable dt.
 pub const DT: f32 = 1.0 / 60.0;
 
-pub const DIG_RADIUS: f32 = 3.8;
+pub const DIG_RADIUS: f32 = 3.4;
 pub const DIG_STRENGTH: f32 = 2.4;
-pub const SHOT_SPEED: f32 = 130.0;
+pub const SHOT_SPEED: f32 = 110.0;
 pub const FIRE_INTERVAL: f32 = 0.11;
 /// Water touching the player hurts if hot; molten always does.
 pub const MOLTEN_DAMAGE_RADIUS: f32 = 4.0;

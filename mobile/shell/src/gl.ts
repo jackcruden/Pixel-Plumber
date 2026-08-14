@@ -137,7 +137,7 @@ void main() {
   if (k == int(uKinds.x + 0.5)) {
     // Water: murkier as purity drops, whitened by speed (turbulence foam).
     c = mix(vec3(0.42, 0.47, 0.16), c, purity);
-    c = mix(c, vec3(0.93, 0.97, 1.0), speed * speed * 0.85);
+    c = mix(c, vec3(0.93, 0.97, 1.0), speed * speed * 0.6);
   } else if (k == int(uKinds.z + 0.5)) {
     // Molten: fast flow is bright liquid fire, slow flow crusts dark.
     c = mix(c * 0.55, vec3(1.0, 0.78, 0.25), speed * 0.9 + 0.15);

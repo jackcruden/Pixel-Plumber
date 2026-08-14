@@ -56,8 +56,8 @@ fn sim_replay_matches() {
         let input = InputFrame {
             move_x: 0.6,
             firing: true,
-            aim_x: 64.0,
-            aim_y: 150.0,
+            aim_x: 48.0,
+            aim_y: 112.0,
             ..Default::default()
         };
         for _ in 0..240 {
@@ -135,8 +135,8 @@ fn mass_conservation() {
     // Stir things up: dig a shaft so water reaches molten/contaminant/intake.
     for step in 0..1200u64 {
         if step % 30 == 0 && step < 660 {
-            let y = 36.0 + (step as f32 / 30.0) * 8.0;
-            s.dig_at(64.0, y, 4.5, 2.5);
+            let y = 27.0 + (step as f32 / 30.0) * 6.0;
+            s.dig_at(48.0, y, 4.0, 2.5);
         }
         s.step(&InputFrame::default());
     }
@@ -160,7 +160,7 @@ fn purity_bounded_and_monotone() {
     let mut s = make_sim();
     // Track a window of purity values across a run that mixes water into
     // the contaminant pool.
-    s.spawn_blob(102.0, 80.0, 5.0, s.ids.water, 100);
+    s.spawn_blob(76.0, 60.0, 4.0, s.ids.water, 80);
     let mut last_mean = 1.0f64;
     for _ in 0..600 {
         s.step(&InputFrame::default());
@@ -212,16 +212,72 @@ fn no_teleportation() {
     }
 }
 
+// ---- Pressure containment: overfill cannot tunnel through walls ----
+
+#[test]
+fn pressure_cannot_tunnel_through_walls() {
+    use sim::fluid::{Fluid, FluidIds, FluidParams};
+    use sim::heat::HeatField;
+    use sim::materials::MaterialTable;
+
+    let materials = MaterialTable::from_ron(MATERIALS).expect("materials");
+    let ids = FluidIds {
+        water: materials.index_of("water").unwrap(),
+        contaminant: materials.index_of("contaminant").unwrap(),
+        molten: materials.index_of("molten").unwrap(),
+        slag: materials.index_of("slag").unwrap(),
+    };
+    // Solid 64x64 block with a sealed r=6 cavity in the middle.
+    let mut field = DensityField::new(64, 64);
+    field.density.iter_mut().for_each(|d| *d = 1.0);
+    field.apply_brush(
+        Brush { x: 32.0, y: 32.0, radius: 9.0, strength: -3.0, material: 0 },
+        |_| false,
+    );
+    let mut heat = HeatField::new(64, 64, 0.0, 0.0);
+    let mut fluid = Fluid::new(FluidParams::default(), ids, 64, 64);
+    let mut rng = Rng::new(11);
+    // ~5x overfill: 300 particles into a cavity that rests ~60.
+    for _ in 0..300 {
+        let a = rng.range_f32(0.0, core::f32::consts::TAU);
+        let d = rng.range_f32(0.0, 4.0);
+        fluid.spawn(
+            Vec2::new(32.0 + a.cos() * d, 32.0 + a.sin() * d),
+            Vec2::ZERO,
+            ids.water,
+            1.0,
+        );
+    }
+    for _ in 0..300 {
+        fluid.step(
+            sim::DT,
+            &mut field,
+            &mut heat,
+            &materials,
+            (-10.0, -10.0, -5.0, -5.0), // intake outside the world
+            &mut rng,
+        );
+    }
+    for i in 0..fluid.len() {
+        let d = (fluid.pos[i] - Vec2::new(32.0, 32.0)).length();
+        assert!(
+            d < 11.0,
+            "particle {i} escaped the sealed cavity: dist {d:.2} at {:?}",
+            fluid.pos[i]
+        );
+    }
+}
+
 // ---- Accretion accounting: slag appears iff molten consumed ----
 
 #[test]
 fn slag_accretion_accounting() {
     let mut s = make_sim();
-    s.dig_at(64.0, 130.0, 8.0, 3.0);
-    s.dig_at(64.0, 138.0, 7.0, 3.0);
+    s.dig_at(48.0, 98.0, 6.5, 3.0);
+    s.dig_at(48.0, 104.0, 5.5, 3.0);
     let base_solid = s.field.total_solid();
-    s.spawn_blob(64.0, 134.0, 5.0, s.ids.molten, 50);
-    s.spawn_blob(64.0, 118.0, 5.0, s.ids.water, 80);
+    s.spawn_blob(48.0, 100.0, 4.5, s.ids.molten, 45);
+    s.spawn_blob(48.0, 88.0, 4.5, s.ids.water, 70);
     for _ in 0..400 {
         s.step(&InputFrame::default());
     }

@@ -72,10 +72,10 @@ function main(pp: PP) {
   const cam: Camera = { x: 0, y: 0, scale: 3 };
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  // Camera shows ~72 cells across — tuned for the initial design target of
-  // an iPhone 17 Pro portrait view (402x874 pt) over the 128-cell-wide
+  // Camera shows ~54 cells across — tuned for the initial design target of
+  // an iPhone 17 Pro portrait view (402x874 pt) over the 96-cell-wide
   // level — and never sees past the field edges.
-  const VIEW_W_CELLS = 72;
+  const VIEW_W_CELLS = 54;
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     for (const c of [glCanvas, ovCanvas]) {

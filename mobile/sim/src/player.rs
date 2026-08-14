@@ -47,10 +47,10 @@ impl Player {
 
     pub fn step(&mut self, dt: f32, input: &InputFrame, field: &DensityField) {
         const ACCEL: f32 = 340.0;
-        const MAX_SPEED: f32 = 42.0;
+        const MAX_SPEED: f32 = 36.0;
         const FRICTION: f32 = 8.0;
         const GRAVITY: f32 = 240.0;
-        const JUMP: f32 = 74.0;
+        const JUMP: f32 = 66.0;
 
         self.aim = Vec2::new(input.aim_x, input.aim_y);
         self.vel.x += input.move_x.clamp(-1.0, 1.0) * ACCEL * dt;
