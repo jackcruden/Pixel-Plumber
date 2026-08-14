@@ -1,0 +1,8 @@
+// Baseline: let the emitter pour with no player action. Water should pool in
+// the spawn chamber (it has no route down yet).
+Scenario(
+    level: "../../levels/demo.ron",
+    materials: "../../materials/materials.ron",
+    steps: 600,
+    snapshot_every: 100,
+)

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pixel Plumber</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #0a0a10; touch-action: none;
+    font-family: "Courier New", monospace; -webkit-user-select: none; user-select: none; }
+  canvas { position: absolute; inset: 0; }
+  #overlay { z-index: 2; }
+  #hud { position: absolute; top: env(safe-area-inset-top, 0); left: 0; right: 0; z-index: 3;
+    padding: 8px 10px; display: flex; gap: 10px; align-items: center; pointer-events: none;
+    color: #cfd6e4; font-size: 11px; text-shadow: 0 1px 2px #000; }
+  .meter { flex: 1; max-width: 180px; }
+  .meter .label { letter-spacing: 1px; margin-bottom: 2px; opacity: 0.8; }
+  .track { position: relative; height: 8px; background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; overflow: hidden; }
+  .fill { height: 100%; width: 0%; border-radius: 3px; transition: width 0.2s; }
+  #volbar { background: #54d1ff; }
+  #purbar { background: #54d1ff; }
+  #hpbar  { background: #ff6a5e; }
+  #purmark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; opacity: 0.9; }
+  #credits { margin-left: auto; white-space: nowrap; }
+  #upgrade { pointer-events: auto; background: rgba(255,255,255,0.08); color: #8f97a8;
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 6px 10px;
+    font: inherit; font-size: 10px; letter-spacing: 1px; }
+  #upgrade.afford { color: #ffe27a; border-color: #ffe27a; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { background: rgba(255,226,122,0.25); } }
+  #jump { position: absolute; left: 14px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 3;
+    width: 74px; height: 74px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.10); color: #dfe6f2; font: inherit; font-size: 12px;
+    letter-spacing: 2px; display: none; }
+  body.touch #jump { display: block; }
+  #banner { position: absolute; inset: 0; z-index: 4; display: none; align-items: center;
+    justify-content: center; flex-direction: column; gap: 18px; background: rgba(5,5,12,0.72); }
+  #bannertext { color: #eef2ff; font-size: 34px; letter-spacing: 6px; text-shadow: 0 2px 12px #54d1ff; }
+  #restart { background: none; border: 2px solid #54d1ff; color: #54d1ff; border-radius: 8px;
+    padding: 12px 26px; font: inherit; font-size: 14px; letter-spacing: 3px; }
+  #help { position: absolute; bottom: max(10px, env(safe-area-inset-bottom)); right: 12px; z-index: 3;
+    color: rgba(255,255,255,0.45); font-size: 10px; text-align: right; pointer-events: none; line-height: 1.5; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="overlay"></canvas>
+<div id="hud">
+  <div class="meter">
+    <div class="label">FLOW</div>
+    <div class="track"><div class="fill" id="volbar"></div></div>
+  </div>
+  <div class="meter">
+    <div class="label">PURITY</div>
+    <div class="track"><div class="fill" id="purbar"></div><div id="purmark"></div></div>
+  </div>
+  <div class="meter">
+    <div class="label">PLUMBER</div>
+    <div class="track"><div class="fill" id="hpbar"></div></div>
+  </div>
+  <span id="credits"></span>
+  <button id="upgrade">UPGRADE</button>
+</div>
+<button id="jump">JUMP</button>
+<div id="banner"><div id="bannertext"></div><button id="restart">RE-ENTER</button></div>
+<div id="help">drag left side: move · touch right side: blast<br>
+  keys: A/D move · W jump · click: blast · U upgrade · R restart</div>
+<script>
+  if ("ontouchstart" in window) document.body.classList.add("touch");
+</script>
+<script src="bundle.js"></script>
+</body>
+</html>

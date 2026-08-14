@@ -1,0 +1,38 @@
+name: mobile-ci
+on:
+  push:
+    branches: ["**"]
+    paths: ["mobile/**", ".github/workflows/mobile-ci.yml"]
+  pull_request:
+    paths: ["mobile/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mobile
+      # Host build + tests (property + snapshot suite)
+      - run: cargo test --release
+      # Wasm target must always build (sim must stay browser-free but wasm-compatible)
+      - run: cargo build -p pp-wasm --target wasm32-unknown-unknown --profile wasm-release
+      # Benches compile (regression numbers are compared locally / by the agent)
+      - run: cargo bench -p harness --no-run
+      # Harness produces a PNG from a clean checkout (M0 exit criterion)
+      - run: |
+          cargo build -p harness --release
+          ./target/release/harness harness/scenarios/pour.ron --out /tmp/harness-out
+          test -f /tmp/harness-out/final.png
+      # Shell type-checks and bundles
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd shell && npm ci && npx tsc --noEmit && node build.mjs
