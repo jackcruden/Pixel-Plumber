@@ -14,7 +14,10 @@ const MATERIALS: &str = include_str!("../../materials/materials.ron");
 const LEVEL: &str = include_str!("../../levels/demo.ron");
 
 fn loaded_sim() -> Sim {
-    let mut s = Sim::new(LEVEL, MATERIALS).expect("sim");
+    // Push the win condition out of reach: a bench frame must be a real
+    // frame, not the Won-state early return.
+    let level = LEVEL.replace("goal_volume: 250", "goal_volume: 100000000");
+    let mut s = Sim::new(&level, MATERIALS).expect("sim");
     // Fill toward the particle cap for a worst-case-ish frame.
     s.spawn_blob(64.0, 60.0, 16.0, s.ids.water, 1500);
     s.spawn_blob(40.0, 150.0, 12.0, s.ids.water, 800);
