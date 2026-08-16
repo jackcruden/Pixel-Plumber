@@ -23,7 +23,7 @@ MaterialTable(
             melting_point: None,
             value: 0,
             tool_tier_required: 0,
-            colour: (0.45, 0.38, 0.30),
+            colour: (0.42, 0.32, 0.23),
         ),
         Material(
             id: "calcite",
@@ -34,7 +34,7 @@ MaterialTable(
             melting_point: None,
             value: 0,
             tool_tier_required: 0,
-            colour: (0.82, 0.78, 0.66),
+            colour: (0.70, 0.62, 0.46),
         ),
         Material(
             id: "vitreous_scale",
@@ -45,7 +45,7 @@ MaterialTable(
             melting_point: None,
             value: 0,
             tool_tier_required: 1,
-            colour: (0.55, 0.70, 0.72),
+            colour: (0.38, 0.54, 0.58),
         ),
         Material(
             id: "pipework",
@@ -56,7 +56,7 @@ MaterialTable(
             melting_point: None,
             value: 0,
             tool_tier_required: 99,
-            colour: (0.35, 0.37, 0.42),
+            colour: (0.30, 0.32, 0.38),
             indestructible: true,
         ),
         Material(
@@ -68,7 +68,7 @@ MaterialTable(
             melting_point: None,
             value: 0,
             tool_tier_required: 0,
-            colour: (0.30, 0.26, 0.28),
+            colour: (0.24, 0.20, 0.23),
         ),
         Material(
             id: "mineral_growth",
@@ -87,7 +87,7 @@ MaterialTable(
             density: 1.0,
             colour: (0.25, 0.55, 0.95),
             particle_mass: 1.0,
-            viscosity: 0.05,
+            viscosity: 0.30,
         ),
         Material(
             id: "contaminant",
@@ -95,7 +95,7 @@ MaterialTable(
             density: 1.4,
             colour: (0.45, 0.60, 0.20),
             particle_mass: 1.45,
-            viscosity: 0.12,
+            viscosity: 0.40,
         ),
         Material(
             id: "molten",
@@ -103,7 +103,7 @@ MaterialTable(
             density: 2.8,
             colour: (1.0, 0.45, 0.10),
             particle_mass: 1.9,
-            viscosity: 0.35,
+            viscosity: 0.55,
             heat_emission: 0.9,
         ),
     ],

@@ -54,6 +54,22 @@ float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+// Smooth value noise + tiny fBm: all texture on this page is organic, never
+// blocky — hard hash-grid patterns read as squares at this zoom.
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float fbm2(vec2 p) {
+  return 0.62 * vnoise(p) + 0.38 * vnoise(p * 2.17 + 19.0);
+}
+
 void main() {
   vec2 world = vec2(uCam.x + vUv.x * uView.x, uCam.y + (1.0 - vUv.y) * uView.y);
   vec2 uv = world / uField;
@@ -71,33 +87,33 @@ void main() {
   float aa = fwidth(d) * 1.2 + 0.004;
   float solid = smoothstep(0.5 - aa, 0.5 + aa, d);
 
-  // ---- Rock interior: posterised chunky shading ----
-  // Big 2-cell blocks quantised into three value bands, plus sparse larger
-  // blotches — features read at phone size instead of fine speckle.
-  float blocks = hash(floor(world / 2.0));
-  float band = floor(blocks * 3.0) / 3.0;
-  float shade = 0.80 + band * 0.30;
-  float blotch = hash(floor(world / 6.0) + 13.0);
-  if (blotch < 0.28) shade *= 0.82;
-  shade *= 1.0 - 0.22 * depthFrac;
+  // ---- Rock interior: organic mottled shading ----
+  // Two scales of smooth noise: broad mineral variation plus soft grain,
+  // and darker pockets. No grid patterns anywhere.
+  float m1 = fbm2(world * 0.09);
+  float m2 = vnoise(world * 0.38 + 53.0);
+  float shade = 0.62 + 0.30 * m1 + 0.08 * m2;
+  shade *= 1.0 - 0.20 * smoothstep(0.55, 0.8, fbm2(world * 0.055 + 31.0));
+  shade *= 1.0 - 0.18 * depthFrac;
   vec3 rock = base * shade;
+  // Interior falloff: deeper inside the rock body darkens, rounding forms.
+  rock *= 1.0 - 0.22 * smoothstep(0.58, 0.95, d);
 
   // Pipework (index 4): machined horizontal banding, no mineral grain.
   if (mi == 4) {
     float stripe = step(0.55, fract(world.y / 3.0));
     rock = base * (0.85 + 0.18 * stripe) * (1.0 - 0.15 * depthFrac);
   }
-  // Slag (index 5): cooled-magma flecks of ember, faintly breathing.
+  // Slag (index 5): ember veins glowing through cooled magma.
   if (mi == 5) {
-    float fleck = step(0.90, hash(floor(world * 1.2) + 3.0));
-    rock += vec3(0.55, 0.22, 0.05) * fleck * (0.75 + 0.25 * sin(uTime * 2.0 + world.x));
+    float vein = smoothstep(0.68, 0.85, vnoise(world * 0.5 + 3.0));
+    rock += vec3(0.50, 0.20, 0.05) * vein * (0.7 + 0.3 * sin(uTime * 1.6 + world.x * 0.3));
   }
-  // Vitreous scale (index 3): rare twinkling glints, not static.
+  // Vitreous scale (index 3): soft glassy shimmer bands.
   if (mi == 3) {
-    vec2 cell = floor(world / 2.0);
-    float spark = step(0.985, hash(cell + 9.0));
-    float tw = 0.5 + 0.5 * sin(uTime * 2.5 + hash(cell + 2.0) * 40.0);
-    rock += vec3(0.40, 0.55, 0.58) * spark * tw * 0.7;
+    float band2 = smoothstep(0.72, 0.92, vnoise(world * 0.22 + 9.0));
+    float tw = 0.5 + 0.5 * sin(uTime * 1.8 + world.x * 0.35 + world.y * 0.2);
+    rock += vec3(0.30, 0.42, 0.45) * band2 * tw * 0.5;
   }
   // Mineral growth (index 6): pulse so harvestables catch the eye.
   if (mi == 6) {
@@ -112,29 +128,26 @@ void main() {
   float dUp = texture(uDensity, (world - vec2(0.0, 1.3)) / uField).r;
   float crust = smoothstep(0.05, 0.22, d - dUp)
               * smoothstep(0.50, 0.56, d) * (1.0 - smoothstep(0.60, 0.72, d));
-  rock += base * crust * 0.60 + vec3(0.05) * crust;
+  rock += base * crust * 0.42 + vec3(0.025) * crust;
 
   // ---- Cave: layered machine backdrop with parallax ----
   // The backdrop pattern scrolls slower than the terrain, so open space
   // reads as depth into the machine rather than flat black.
   vec2 bg = vec2(uCam.x, uCam.y) * 0.55 + (world - vec2(uCam.x, uCam.y));
-  vec3 cave = mix(vec3(0.085, 0.082, 0.115), vec3(0.028, 0.028, 0.048), depthFrac);
-  // Distant machine plates: big panels with darker seams and rivets.
-  vec2 pl = fract(bg / 11.0) * 11.0;
-  float plate = hash(floor(bg / 11.0) + 40.0);
-  cave *= 0.88 + 0.24 * plate;
-  float seam = step(pl.x, 0.55) + step(pl.y, 0.55);
-  cave *= 1.0 - 0.28 * clamp(seam, 0.0, 1.0);
-  float rivet = step(distance(pl, vec2(1.6, 1.6)), 0.5);
-  cave += vec3(0.030, 0.030, 0.040) * rivet;
-  // Distant rock silhouettes drifting behind the plates.
-  float sil = hash(floor(bg / 7.0) + 5.0);
-  cave *= 0.84 + 0.26 * step(0.45, sil);
-  // Ambient occlusion: empty space near a wall darkens — quantised into
-  // bands so it reads as chunky shadow, not blur.
-  float ao = smoothstep(0.34, 0.50, d);
-  ao = floor(ao * 3.0 + 0.5) / 3.0;
-  cave *= 1.0 - 0.45 * ao;
+  vec3 cave = mix(vec3(0.082, 0.080, 0.112), vec3(0.026, 0.026, 0.045), depthFrac);
+  // Distant rock masses: broad smooth silhouettes.
+  float sil = fbm2(bg * 0.045 + 5.0);
+  cave *= 0.72 + 0.42 * smoothstep(0.30, 0.75, sil);
+  // Faint machine plates: soft seams, no hard grid.
+  vec2 pl = fract(bg / 13.0) * 13.0;
+  float plate = hash(floor(bg / 13.0) + 40.0);
+  cave *= 0.94 + 0.12 * plate;
+  float seam = smoothstep(0.9, 0.0, pl.x) + smoothstep(0.9, 0.0, pl.y);
+  cave *= 1.0 - 0.14 * clamp(seam, 0.0, 1.0);
+  // Ambient occlusion: soft shadow where open space meets a wall (the field
+  // transition is narrow, so this stays tight, not smeared).
+  float ao = smoothstep(0.32, 0.50, d);
+  cave *= 1.0 - 0.48 * ao;
 
   vec3 col = mix(cave, rock, solid);
   // Vignette pulls focus to the centre of the view.
@@ -209,37 +222,48 @@ float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
 void main() {
   vec2 world = vec2(uCam.x + vUv.x * uView.x, uCam.y + (1.0 - vUv.y) * uView.y);
-  // Jelly wobble: perturb the lookup per 2-cell block, twice a second.
-  vec2 wob = vec2(hash(floor(world / 2.0) + floor(uTime * 2.0) * 3.0),
-                  hash(floor(world / 2.0) + floor(uTime * 2.0) * 3.0 + 7.0)) - 0.5;
-  vec4 s = texture(uSplat, vUv + wob * 0.0022);
+  vec4 s = texture(uSplat, vUv);
   float t = s.a;
-  float body = smoothstep(0.20, 0.34, t);
+  float body = smoothstep(0.17, 0.31, t);
   if (body <= 0.003) discard;
   vec3 c = s.rgb / max(t, 1e-4);
 
-  // Caustic shimmer: large soft patches drifting through the body.
-  float caustic = step(0.72, hash(floor(world / 3.5) + floor(uTime * 2.0) * 11.0));
-  c += caustic * 0.035 * smoothstep(0.40, 0.90, t);
+  // Depth grade: thick fluid shifts toward a deep saturated tone.
+  vec3 deepTint = vec3(0.10, 0.24, 0.48);
+  float deep = smoothstep(0.50, 1.30, t);
+  c = mix(c, c * 0.55 + deepTint * 0.45, deep * 0.6);
 
-  // Depth: thick fluid darkens and saturates.
-  c *= 1.0 - smoothstep(0.55, 1.5, t) * 0.30;
+  // Caustics: slow, soft light patches drifting through the body.
+  float ca = vnoise(world * 0.30 + vec2(uTime * 0.18, uTime * 0.07));
+  c += smoothstep(0.60, 0.85, ca) * 0.05 * smoothstep(0.40, 0.90, t);
 
   // Surface band near the threshold.
-  float rim = smoothstep(0.20, 0.29, t) * (1.0 - smoothstep(0.29, 0.52, t));
+  float rim = smoothstep(0.17, 0.26, t) * (1.0 - smoothstep(0.26, 0.50, t));
 
-  // Foam: animated chunky dither on the surface band. Fast (already
-  // whitened) fluid foams hard; calm surfaces get only a thin bright line.
-  float sparkle = step(0.42, hash(floor(world * 1.6) + floor(uTime * 7.0) * 17.0));
-  float whiteness = smoothstep(0.55, 0.9, max(c.r, max(c.g, c.b)));
-  float foam = rim * (0.30 + 0.70 * max(sparkle * 0.8, whiteness));
-  c = mix(c, vec3(0.94, 0.97, 1.0), clamp(foam, 0.0, 0.85));
+  // Foam only where the fluid genuinely moves: the splat pass whitens fast
+  // particles (with a rest-speed deadzone in the sim export), so settled
+  // pools stay calm and get just a thin surface lightening.
+  float whiteness = smoothstep(0.60, 0.92, max(c.r, max(c.g, c.b)));
+  float lap = smoothstep(0.45, 0.8, vnoise(world * 0.5 + vec2(uTime * 0.5, 0.0)));
+  float foam = rim * (0.12 + 0.85 * whiteness * (0.5 + 0.5 * lap));
+  c = mix(c, vec3(0.94, 0.97, 1.0), clamp(foam, 0.0, 0.8));
 
   // Top-surface sheen: t falls off upward at an up-facing surface.
-  float sheen = clamp(-dFdy(t) * 6.0, 0.0, 1.0) * rim;
-  c += sheen * 0.20;
+  float sheen = clamp(-dFdy(t) * 5.0, 0.0, 1.0) * rim;
+  c += sheen * 0.16;
 
   frag = vec4(c, body * 0.95);
 }`;
@@ -380,7 +404,7 @@ export class Renderer {
       gl.uniform2f(u("uView"), viewW, viewH);
       // Splat support radius ~2.6 cells; the FBO is half-res, so a point's
       // pixel size there is cells * (scale/2) * 2 = cells * scale.
-      gl.uniform1f(u("uPointPx"), 2.6 * cam.scale);
+      gl.uniform1f(u("uPointPx"), 3.1 * cam.scale);
       gl.uniform1f(u("uGlowPass"), 0);
       gl.uniform1f(u("uGain"), 1);
       gl.uniform3fv(u("uPalette"), this.palette);

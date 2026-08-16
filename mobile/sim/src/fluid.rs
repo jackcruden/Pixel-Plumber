@@ -60,9 +60,9 @@ impl Default for FluidParams {
         Self {
             h: 2.8,
             spacing: 1.3,
-            gravity: 240.0,
-            iterations: 3,
-            max_velocity: 100.0,
+            gravity: 130.0,
+            iterations: 4,
+            max_velocity: 55.0,
             s_corr_k: 0.0006,
             interact_radius: 2.0,
             purity_mix_rate: 3.0,

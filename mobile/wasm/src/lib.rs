@@ -98,12 +98,14 @@ pub extern "C" fn pp_step(move_x: f32, aim_x: f32, aim_y: f32, buttons: u32) {
 
     // Particle metadata.
     let fl = &st.sim.fluid;
-    let inv_max_v = 1.0 / fl.params.max_velocity;
     st.meta.clear();
     for i in 0..fl.len() {
         st.meta.push(fl.kind[i]);
         st.meta.push((fl.purity[i] * 255.0) as u8);
-        let speed = (fl.vel[i].length() * inv_max_v * 2.2).min(1.0);
+        // Agitation with a deadzone: settled pools carry residual solver
+        // jitter (~<10 cells/s) that must NOT read as turbulence — only
+        // genuinely moving fluid foams.
+        let speed = ((fl.vel[i].length() - 10.0) / 28.0).clamp(0.0, 1.0);
         st.meta.push((speed * 255.0) as u8);
         st.meta.push(0);
     }
