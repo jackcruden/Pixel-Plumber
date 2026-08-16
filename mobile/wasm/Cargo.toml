@@ -1,0 +1,12 @@
+[package]
+name = "pp-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pp_wasm"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sim = { path = "../sim" }
+glam = "0.29"

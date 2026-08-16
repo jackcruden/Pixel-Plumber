@@ -1,0 +1,16 @@
+[package]
+name = "sim"
+version = "0.1.0"
+edition = "2021"
+
+# HARD RULE (see AGENTS.md): this crate is pure computation.
+# No wasm-bindgen, no web-sys, no js-sys, no I/O, no logging, no wall-clock
+# time, no threads, no system entropy. State in, state out.
+
+[dependencies]
+glam = "0.29"
+serde = { version = "1", features = ["derive"] }
+ron = "0.8"
+
+[dev-dependencies]
+proptest = "1"

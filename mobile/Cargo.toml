@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["sim", "wasm", "harness"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+
+# Small, fast wasm builds.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+panic = "abort"
+codegen-units = 1

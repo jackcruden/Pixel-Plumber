@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pixel Plumber</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #0a0a10; touch-action: none;
+    font-family: "Courier New", monospace; -webkit-user-select: none; user-select: none; }
+  canvas { position: absolute; inset: 0; }
+  #overlay { z-index: 2; }
+  #hud { position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 14px;
+    display: flex; gap: 12px; align-items: flex-end; pointer-events: none;
+    color: #cfd6e4; font-size: 11px; text-shadow: 0 1px 2px #000;
+    background: linear-gradient(180deg, rgba(8,10,18,0.88) 0%, rgba(8,10,18,0.55) 70%, rgba(8,10,18,0) 100%); }
+  .meter { flex: 1; max-width: 170px; }
+  .meter .label { display: flex; justify-content: space-between; letter-spacing: 1.5px;
+    margin-bottom: 3px; font-weight: 700; font-size: 10px; }
+  .meter .label .val { opacity: 0.85; letter-spacing: 0.5px; font-weight: 400; }
+  .track { position: relative; height: 10px; background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.28); border-radius: 5px; overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
+  .fill { height: 100%; width: 0%; border-radius: 4px; transition: width 0.2s; }
+  #volbar { background: linear-gradient(180deg, #8ae4ff, #38b6e8); box-shadow: 0 0 6px rgba(90,210,255,0.55); }
+  #purbar { background: #54d1ff; box-shadow: 0 0 6px rgba(90,210,255,0.4); }
+  #hpbar  { background: linear-gradient(180deg, #93f0a5, #4dc06a); box-shadow: 0 0 6px rgba(110,222,124,0.5); }
+  #purmark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; opacity: 0.9; }
+  #stack { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  #creditrow { display: flex; gap: 8px; align-items: baseline; }
+  #credits { color: #9fe7a9; font-weight: 700; letter-spacing: 1px; }
+  #tier { color: #8f97a8; font-size: 9px; letter-spacing: 1.5px; }
+  #upgrade { pointer-events: auto; background: rgba(16,20,34,0.85); color: #6f7890;
+    border: 2px solid rgba(255,255,255,0.22); border-radius: 8px; padding: 7px 12px;
+    font: inherit; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+  #upgrade.afford { color: #ffe27a; border-color: #ffd75e;
+    box-shadow: 0 0 12px rgba(255,215,94,0.45), 0 2px 6px rgba(0,0,0,0.5);
+    animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { background: rgba(120,96,20,0.65); } }
+  #jump { position: absolute; left: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 3;
+    width: 78px; height: 78px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.35);
+    background: radial-gradient(circle at 50% 38%, rgba(80,95,130,0.5), rgba(20,26,44,0.6));
+    color: #e6ecf8; font: inherit; font-size: 12px; font-weight: 700;
+    letter-spacing: 2px; display: none; box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
+  #jump:active { background: radial-gradient(circle at 50% 38%, rgba(120,140,190,0.6), rgba(30,40,66,0.7)); }
+  body.touch #jump { display: block; }
+  #banner { position: absolute; inset: 0; z-index: 4; display: none; align-items: center;
+    justify-content: center; flex-direction: column; gap: 12px;
+    background: rgba(4,5,12,0.78); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+  #bannertext { color: #eef2ff; font-size: 32px; font-weight: 700; letter-spacing: 8px;
+    text-align: center; text-shadow: 0 0 18px #54d1ff, 0 0 42px rgba(84,209,255,0.5), 0 2px 2px #000; }
+  #bannersub { color: #93a3c0; font-size: 12px; letter-spacing: 2px; margin-bottom: 12px; }
+  #restart { background: rgba(10,26,36,0.6); border: 2px solid #54d1ff; color: #aee9ff; border-radius: 10px;
+    padding: 13px 30px; font: inherit; font-size: 14px; font-weight: 700; letter-spacing: 3px;
+    box-shadow: 0 0 16px rgba(84,209,255,0.35); }
+  #help { position: absolute; bottom: max(10px, env(safe-area-inset-bottom)); right: 12px; z-index: 3;
+    color: rgba(255,255,255,0.38); font-size: 10px; text-align: right; pointer-events: none; line-height: 1.6; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="overlay"></canvas>
+<div id="hud">
+  <div class="meter">
+    <div class="label"><span>FLOW</span><span class="val" id="volnum"></span></div>
+    <div class="track"><div class="fill" id="volbar"></div></div>
+  </div>
+  <div class="meter">
+    <div class="label"><span>PURITY</span></div>
+    <div class="track"><div class="fill" id="purbar"></div><div id="purmark"></div></div>
+  </div>
+  <div class="meter">
+    <div class="label"><span>PLUMBER</span></div>
+    <div class="track"><div class="fill" id="hpbar"></div></div>
+  </div>
+  <div id="stack">
+    <div id="creditrow"><span id="credits"></span><span id="tier"></span></div>
+    <button id="upgrade">UPGRADE</button>
+  </div>
+</div>
+<button id="jump">JUMP</button>
+<div id="banner"><div id="bannertext"></div><div id="bannersub"></div><button id="restart">RE-ENTER</button></div>
+<div id="help">drag left side: move · touch right side: blast<br>
+  keys: A/D move · W jump · click: blast · U upgrade · R restart</div>
+<script>
+  if ("ontouchstart" in window) document.body.classList.add("touch");
+</script>
+<script src="bundle.js"></script>
+</body>
+</html>

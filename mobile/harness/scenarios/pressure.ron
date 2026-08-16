@@ -1,0 +1,12 @@
+// Tunneling regression: massively overfill a sealed cavity with water and
+// verify the pressure spike cannot push particles through the walls.
+Scenario(
+    level: "../../levels/demo.ron",
+    materials: "../../materials/materials.ron",
+    steps: 600,
+    snapshot_every: 100,
+    actions: [
+        Dig(step: 10, x: 20.0, y: 118.0, r: 6.0),
+        Blob(step: 30, x: 20.0, y: 118.0, r: 5.0, kind: "water", count: 500),
+    ],
+)

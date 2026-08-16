@@ -1,0 +1,19 @@
+// The additive mechanic: drop water onto a molten blob and verify the contact
+// builds solid slag geometry (a dam) in the open cavity.
+Scenario(
+    level: "../../levels/demo.ron",
+    materials: "../../materials/materials.ron",
+    steps: 900,
+    snapshot_every: 75,
+    actions: [
+        // Open a cavity mid-level.
+        Dig(step: 10, x: 48.0, y: 96.0, r: 6.5),
+        Dig(step: 20, x: 43.0, y: 101.0, r: 5.0),
+        Dig(step: 30, x: 53.0, y: 101.0, r: 5.0),
+        // Molten pool at the cavity floor.
+        Blob(step: 60, x: 48.0, y: 99.0, r: 4.0, kind: "molten", count: 50),
+        // Water dropped on top from above.
+        Blob(step: 240, x: 48.0, y: 90.0, r: 3.8, kind: "water", count: 65),
+        Blob(step: 420, x: 48.0, y: 90.0, r: 3.8, kind: "water", count: 65),
+    ],
+)
